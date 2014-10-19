@@ -1,0 +1,206 @@
+{%extends "base.html" %}
+
+{%block content%}
+<script type="text/javascript">	
+
+$(document).ready(function() {
+	$("button.modalclose").click(function(){
+	location.reload();
+	console.log("qwe");
+});
+      $("button.order").click(function(){
+      	
+	  thebutton=$(this);
+	  if($(this).attr("type")=="submit")
+	  {
+	      thebutton.addClass("disabled");
+	      //buy modal
+	      var price=0;
+	      var quantity=0;
+	      var shareid=0;
+	      var urltocall="";
+	      if($(this).parents("div.modal").hasClass("buymodal"))
+	      {
+		//its a buy modal
+		price=$(this).parents("div.modal").find("input.buyprice").val();
+		quantity=$(this).parents("div.modal").find("input.buyquantity").val();
+		shareid=$(this).parents("div.modal").find("input.buyshare").val();
+		urltocall="/bid/";
+	      }
+	      
+	      else
+	      {
+		//its a sell modal
+		price=$(this).parents("div.modal").find("input.sellprice").val();
+		quantity=$(this).parents("div.modal").find("input.sellquantity").val();
+		shareid=$(this).parents("div.modal").find("input.sellshare").val();
+		urltocall="/sell/";
+	      }
+	      console.log("your data sir!");
+	      console.log(price);
+	      console.log(quantity);
+	      console.log(shareid);
+	      console.log(urltocall);
+	      
+		$.ajax({
+				url : urltocall,
+				type : "POST",
+				dataType: "json",
+				data : {
+						csrfmiddlewaretoken: '{{ csrf_token }}',
+						price:price,
+						quantity : quantity,
+						share: shareid,
+						},
+				success : function(hill) {
+					console.log(hill.server_response);
+					if(hill.server_response!="wronginput")
+					{
+						console.log("Congratulations! the transaction was successful.");
+                                                thebutton.parents("div.modal-body").children("div.respmsg").html("Congrats! order was successful.");
+										}
+					else
+					{
+						console.log("The transaction was not successful.");
+						thebutton.parents("div.modal-body").children("div.respmsg").html("The order was not successful,check errors.");
+					}
+					
+					thebutton.removeClass("disabled");
+					//location.href("/marketwatch/");
+				},
+				error : function(xhr,errmsg,err) {
+			//	alert(xhr.status + ": " + xhr.responseText);
+				}
+		      });
+		      
+      }
+return false;
+});
+});
+</script>
+<h2>Market Watch</h2>
+
+<table class="table table-striped table-bordered table-condensed">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Share Name</th>
+            <th>Opening price</th>
+			<th>Current Market Price</th>
+            <th>Percentage Change</th>
+			{% if request.session.login_id %}
+			<th>Trade</th>
+			{% endif %}
+        </tr>
+    </thead>
+	
+    <tbody>	
+{% for share in market %}
+	<tr>
+		<td>{{forloop.counter}}</td>
+		<td><a href="/analysis/?q={{share.shareid}}">{{share.name}}</a></td>
+		<td>{{share.starting_price}}</td>
+		<td>{{share.current_price}}</td>
+		<td>{{share.percentage|floatformat:2}}</td>
+		{% if request.session.login_id %}
+		<td><a href="#{{share.shareid}}Modal" role="button" class="btn" data-toggle="modal">Buy</a>
+		{% endif %}
+			 {% for i in usershares %}
+		{% if i.shareid == share.shareid %}
+		&nbsp;&nbsp;<a href="#{{share.shareid}}sellModal" role="button" class="btn" data-toggle="modal">Sell</a>
+		{% endif %}
+		{% endfor %}
+		</td>
+	</tr>
+{% endfor %}
+</table>
+
+
+{% for share in market %}
+
+<div id="{{share.shareid}}Modal" class="modal hide fade buymodal" tabindex="-1" role="dialog" aria-labelledby="Trade" aria-hidden="true" >
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">x</button>
+    <h3 id="Trade">Trade {{share.name}}</h3>
+	<h5>Bid Range: {{share.min}} - {{share.max}}</h5>
+  </div>
+  <div class="modal-body">
+	<div class="row"> </div>
+		
+	<form action="/bid/" method="POST"class="form-horizontal">
+	{% csrf_token %}
+	   <input class="buyshare" type="hidden" name="share" value="{{share.shareid}}">
+	   <div class="control-group">
+	  <label class="control-label" for="price">Quote </label>
+	  <div class="controls" >
+	    <input class="buyprice" type="number" name = "price"  step="0.01" style = "height:40px"  min="{{share.min}}" max="{{share.max}}"  required="true" id="price" placeholder="{{share.current_price}}">
+	  </div>
+	</div>
+	<div class="control-group">
+	  <label class="control-label" for="quantity">Quantity</label>
+	  <div class="controls">
+	    <input class="buyquantity" type="number" name="quantity" min="1" style = "height:40px"  "required="true" id="quantity" placeholder="Quantity">
+	  </div>
+	</div>
+	<div class="control-group">
+	<div class="controls">
+	   <button type="submit" class="btn order">Buy</button>
+
+	</div>
+	</div>
+	</form>
+	<div class="respmsg"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn modalclose" data-dismiss="modal" aria-hidden="true">Close</button>
+  </div>
+</div>
+
+
+
+
+
+{% endfor %}
+
+{% for share in usershares %}
+
+<div id="{{share.shareid}}sellModal" class="modal hide fade sellmodal" tabindex="-1" role="dialog" aria-labelledby="Trade" aria-hidden="true">
+  <div class="modal-header">
+    <button type="button" class="close" data-dismiss="modal" aria-hidden="true">x</button>
+    <h3 id="Trade">Trade {{share.name}}</h3>
+	<h5>Offer Range: {{share.min}} - {{share.max}}</h5>
+  </div>
+  <div class="modal-body">
+	<form action="/sell/" method="POST"class="form-horizontal">
+	{% csrf_token %}
+	 <input class="sellshare" type="hidden" name="share" value="{{share.shareid}}">
+	<div class="control-group">
+	  <label class="control-label" for="price">Quote</label>
+	  <div class="controls" >
+	    <input class="sellprice" type="number" name = "price"  style = "height:40px"  min="{{share.min}}" step="0.01"  max="{{share.max}}"  required="true" id="price" placeholder="{{share.current_price}}">
+	  </div>
+	</div>
+	<div class="control-group">
+	  <label class="control-label" for="quantity">Quantity</label>
+	  <div class="controls">
+	    <input class="sellquantity" type="number" name="quantity" min="1" style = "height:40px"  max="{{share.quantity}}" required="true" id="quantity" placeholder="{{share.quantity}}">
+	  </div>
+	</div>
+	<div class="control-group">
+	  <div class="controls">
+	    <button type="submit" class="btn order">Sell</button>
+	  </div>
+	</div>
+	</form>
+	<div class="respmsg"></div> 
+ </div>
+  
+  <div class="modal-footer">
+    <button class="btn modalclose" data-dismiss="modal" aria-hidden="true">Close</button>
+  </div>
+</div>
+
+{%endfor%}
+
+{%endblock%}
+
